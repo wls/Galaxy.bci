@@ -1,0 +1,1879 @@
+00001 option base 1
+00002 randomize
+00010 margin 0
+00020 characteristics "ON","NRM","ULC","EB0"      ! "NKI"
+00030 characteristics "OFF","UCO","ST","OTT","EB1","FKT"
+00040 declare all real*8
+00041 def FNSC(X,Y)=Y*24+X*2+134     ! set SC$ from (-5,-5) to (5,5) w/(0,0) org
+00042 declare real*4 LST1,LST2,LST3,LST4,LST5,LST6,LST7,LST8,DX,DY,WARP
+00043 declare integer*2 SILENT,INORBIT
+00044 let SILENT,INORBIT=0
+00045 let COMLEN=200                              ! communications length
+00046 def FNOFF$(X)
+00047   if X=0 then let FNOFF$="Off" else let FNOFF$=str$(X)
+00048 end def
+00050 let SRS,URSCORE,URKILL,DISABLED,ENABLED,MANAGER,PRIV,PLAYERS,RESPONSE=0
+00051 let LR=0
+00052 let MAXWARP=12
+00053 let MAXPHASER=500000
+00054 let UNIVERSE=10000
+00055 let TRIANG=2000
+00056 let MMENG=500000
+00057 let MMSHL=500000
+00060 dim SC$*10000,TEMP$*200,CL$*200,C$*100,A$*100,TMP$*850,TM$*200,IM$*500,OLDSC$*10000,GA$*512,G$*512
+00062 let HOWFAR=250                         ! how far from origin when starting
+00070 dim VL$(9)*180                            ! 80 cols, include blink and all
+00071 mat VL$=nul$
+00080 let IM$="GOOD LUCK!"
+00100 def LEFT$(A$,I)=A$(1:I)
+00101 def INLIST(A$,B$)
+00102   let AX$=uprc$(ltrm$(rtrm$(A$)))
+00103   let BX$=uprc$(ltrm$(rtrm$(B$)))
+00104   let P=pos(BX$,AX$)
+00105   let INLIST=0
+00106   if P>0 then if pos(", ",BX$(P+len(AX$):P+len(AX$)))>0 and (P=1 or pos(", ",BX$(P-1:P-1))>0) then let INLIST=-1
+00108 end def
+00120 print chr$(3);chr$(15);chr$(29);chr$(18);chr$(21);chr$(30);"FFGALAXY (c)1988 Wizard Workshop and Company"
+00130 print "v3.8   (c)1988 Walt Stoneburner"
+00131 def FNS(X,Y)=sin(X+Y)*Y*cos(Y)*X
+00135 let WEL$=""
+00138 let X,Y=0
+00140 print chr$(29);chr$(18);chr$(15)
+00141 let CFATAL,NEWUSER,DEG,DIS,X1,Y1,X2,Y2,WARP=0
+00150 who into A$
+00160 let PID=val(ltrm$(rtrm$(A$(5:8))))
+00170 let USER$=ltrm$(A$(8:pos(A$,":",8)-1))
+00180 let CONFIG$=":SDD:UDD:KALLAN:GALAXY.ACCESS"                      ! file #1
+00181 let GUSR$=":SDD:UDD:150A.MONROE:GXY.USERS"  ! file #1
+00182 let GSHIP$=":SDD:UDD:150A.MONROE:GXY.SHIPS"                      ! file #2
+00183 let GCOM$=":SDD:UDD:150A.MONROE:GXY.COMMUNICATION"               ! file #3
+00184 let GSHA$=":SDD:UDD:150A.MONROE:GXY.SHARED"                      ! file #4
+00187 let GRW$="PER.STONEY,OWARE 280.STONEY,OWARE +,RW"       ! I own, but share
+00188 gosub 04000
+00190 enable handler NO_CONFIG, resume at 99920
+00200 close
+00210 open #1:CONFIG$ display, outin, begin, shared, stream
+00220 disable handler
+00230 let L=0
+00238 let PROCESS=-1
+00239 let MESSAGE=0
+00240 linput #1 eof 00465:CL$
+00250 let L=L+1
+00260 let C$=uprc$(ltrm$(rtrm$(CL$)))
+00280 let E=pos(C$,"=")
+00281 if E>0 then
+00282   let AR$=ltrm$(C$(E+1:len(C$)))
+00283   let C$=rtrm$(C$(1:E-1))
+00284 end if
+00285 let C=len(C$)
+00290 if C$="END" then 00238
+00291 if MESSAGE then
+00292   print CL$
+00293   goto 00240
+00294 end if
+00295 if PROCESS=0 then 00240
+00296 if C$="" or C$(1:1)="!" then 00240
+00330 if PROCESS=0 then 00370
+00331 if C>0 and C<9 and C$=LEFT$("DISABLED",C) then
+00332   if INLIST(USER$,AR$) then let DISABLED=-1
+00333   goto 00240
+00334 end if
+00335 if C>0 and C<8 and C$=LEFT$("ENABLED",C) then
+00336   if INLIST(USER$,AR$) then let ENABLED=-1
+00337   goto 00240
+00338 end if
+00339 if C>0 and C<8 and C$=LEFT$("WELCOME",C) then
+00340   let WEL$=AR$
+00341   goto 00240
+00342 end if
+00343 if C>0 and C<8 and C$=LEFT$("MANAGER",C) then
+00344   if INLIST(USER$,AR$) then let MANAGER=-1
+00345   goto 00240
+00346 end if
+00347 if C>0 and C<11 and C$=LEFT$("PRIVILEGED",C) then
+00348   if INLIST(USER$,AR$) then let PRIV=-1
+00349   goto 00240
+00350 end if
+00351 if C>0 and C<5 and C$=LEFT$("TYPE",C) then
+00352   let TFILE$=AR$
+00353   gosub 00580
+00354   goto 00240
+00355 end if
+00356 if C>0 and C<7 and C$=LEFT$("STATUS",C) then
+00357   if AR$(1:1)="D" then print "Galaxy has been disabled."
+00358   if AR$(1:1)="S" then print "Galaxy has been shutdown."
+00359   if AR$(1:1)="M" then print "Galaxy is undergoing maintence."
+00360   if pos("DSM",AR$(1:1))<>0 then
+00361     let CFATAL=-1
+00362     goto 00240
+00363   end if
+00364 end if
+00370 if LEFT$(C$,7)="IF NOT " then
+00371   let PROCESS=abs(sgn(INLIST(USER$,C$(8:len(C$)))))-1
+00372   goto 00240
+00373 end if
+00374 if C$(1:3)="IF " then
+00375   let PROCESS=INLIST(USER$,C$(4:len(C$)))
+00376   goto 00240
+00377 end if
+00382 if C$="COMMENT" then
+00383   let PROCESS=0
+00384   goto 00240
+00385 end if
+00386 if C$="MESSAGE" then
+00387   let MESSAGE=-1
+00388   goto 00240
+00389 end if
+00390 if C>1 and C<8 and LEFT$("PLAYERS",C)=C$ then
+00391   let N$=AR$
+00392   gosub 05800
+00393   if ER<>0 then 00460
+00394   let PLAYERS=N
+00395   goto 00240
+00396 end if
+00397 if C>0 and C<9 and LEFT$("RESPONSE",C)=C$ then
+00398   let N$=AR$
+00399   gosub 05800
+00400   if ER<>0 then 00460
+00401   let RESPONSE=N
+00402   goto 00240
+00403 end if
+00404 if C$="CLS" then
+00405   print chr$(12);
+00406   goto 00240
+00407 end if
+00408 if C>1 and C<8 and LEFT$("PHASER",C)=C$ then
+00409   let N$=AR$
+00410   gosub 05800
+00411   if ER<>0 then 00460
+00412   let MAXPHSR=N
+00413   goto 00240
+00414 end if
+00415 if C>0 and C<5 and LEFT$("WARP",C)=C$ then
+00416   let N$=AR$
+00417   gosub 05800
+00418   if ER<>0 then 00460
+00419   let MAXWARP=N
+00420   goto 00240
+00421 end if
+00422 if C>0 and C<9 and LEFT$("UNIVERSE",C)=C$ then
+00423   let N$=AR$
+00424   gosub 05800
+00425   if ER<>0 then 00460
+00426   let UNIVERSE=N
+00427   goto 00240
+00428 end if
+00429 if C>0 and C<13 and LEFT$("TRIANGULATOR",C)=C$ then
+00430   let N$=AR$
+00431   gosub 05800
+00432   if ER<>0 then 00460
+00433   let TRIANG=N
+00434   goto 00240
+00435 end if
+00436 if C>0 and C<7 and LEFT$("ENERGY",C)=C$ then
+00437   let N$=AR$
+00438   gosub 05800
+00439   if ER<>0 then 00460
+00440   let MMENG=N
+00441   goto 00240
+00442 end if
+00443 if C>0 and C<8 and LEFT$("SHIELDS",C)=C$ then
+00444   let N$=AR$
+00445   gosub 05800
+00446   if ER<>0 then 00460
+00447   let MMSHL=N
+00448   goto 00240
+00449 end if
+00460 print chr$(14);"GALAXY COMPUTER REPORTS ERROR ON LINE: ";L;chr$(15)
+00461 let CFATAL=-1
+00462 print "%GALAXY-Fatal, Unknown Configuation Item in Access Profile"
+00463 print chr$(28);CL$;chr$(29);chr$(10)
+00464 goto 00240
+00465 close
+00480 if CFATAL<>0 or DISABLED<>0 then 99900      ! do not allow access
+00481 if ENABLED<>0 then 00499
+00482 if PLAYERS>0 then
+00483   if GU<=PLAYERS then 00487
+00484   print chr$(14);"*GALAXY IS AT ITS CAPACITY*";chr$(15);chr$(10);"There are already";GU-1;"player(s) using GALAXY.  You must wait till one of them";chr$(10);"is finished."
+00485   goto 99900
+00486 end if
+00487 if TD>RESPONSE then
+00488   print chr$(14);"*DATA GENERAL IS RUNNING TOO SLOW*";chr$(15);chr$(10);"The Data General response time is miserable.";chr$(10);"Galaxy will not be operational until things speed up."
+00489   goto 99900
+00490 end if
+00499 goto 00660
+00500 handler NO_CONFIG
+00510   print chr$(10);chr$(10);chr$(10);"Unable to access the galaxy computer.  Try again later."
+00520   resume
+00530 end handler
+00540 handler RESM
+00550   resume
+00560 end handler
+00580 if TFILE$="" then return
+00585 enable handler RESM, resume at 00640
+00590 open #10:TFILE$ sequential, input, display, begin
+00600 close #10
+00610 type TFILE$
+00640 disable handler
+00650 return
+00660 let TFILE$=WEL$
+00670 gosub 00580
+00679 close
+00680 enable handler RESM, resume at 00685
+00681 if WEL$<>"" then linput prompt "-press a key-", wait 60, bytes 1, noecho:A$
+00685 disable handler
+00687 let I=0
+00690 goto 00800
+00700                              ! X1,Y1 and X2,Y2 are co-ordinates of from-to
+00701                                      ! DEG and DIS are degree and distance
+00702                                          ! co-ord to DEG&DIS via gosub 100
+00703                                   ! X1,Y1 DEG&DIS to co-ord via GOSUB 1200
+00704                                 ! point path X1,Y1 to X2,Y2 via GOSUB 2000
+00705                                     ! action taken on TX1,TY1 in line 3500
+00750 enable handler NO_CONFIG, resume at 99900
+00751 let I=-1
+00754 print chr$(13);"*Big Bang Is About To Occur*";chr$(11);
+00760 create GUSR$ replace
+00761 create GSHIP$ replace
+00762 create GCOM$ replace
+00763 create GSHA$ replace
+00769 print chr$(13);"*Big Bang Has Exploded*";chr$(11);
+00770 acl GUSR$,GRW$
+00771 acl GSHIP$,GRW$
+00772 acl GCOM$,GRW$
+00773 acl GSHA$,GRW$
+00779 print chr$(13);"*The Galaxy Is Expanding*";chr$(11);
+00780 disable handler
+00800 if I<>-1 then enable handler RESM, resume at 00750
+00805 print chr$(13);"*Consulting The Galaxy Computer*";chr$(11);
+00810 close
+00820 open #1:GUSR$ direct, internal, outin, begin, shared,fixed 38
+00830 map US%*15; integer*4 SCORE,KILLS,DTH,BX,BY
+00840 open #2:GSHIP$ direct, internal, outin, begin, shared,fixed 114
+00850 map real SWARP,SDEG; integer*4 SX,SY,SENG,SOWNER,SR1,SR2,SR3,SMAXENG,SENGREG,SWCOST,SSHLD,SSHMX,SSTAT;SH%*20; real SD(1 .. 8)
+00855 open #3:GCOM$ direct, internal, outin, begin, shared,fixed 118
+00860 map TEXT%*100; integer*4 SFR,STO,MTYP,GVAL  ! text,from,to,type,value
+00865 open #4:GSHA$ direct, internal, outin, begin, shared,fixed 4
+00866 print chr$(13);chr$(11);
+00870 map integer*4 LEOF
+00871 let LEOF=0
+00872 ! record 1 holds Log-EOF       other records may hold alliance information
+00873 input #4 eof 00874, record 1 data 00870
+00874 let LR=LEOF
+00875 if LR>COMLEN then let LR=0
+00898 let SFR,STO,MTYP,GVAL=0
+00903 let US%=""
+00904 let SH%=""
+00905 let TEXT%=""
+00907 let USER=0
+00908 let USER=USER+1
+00909 randomize
+00912 input #1 eof 00917, record USER data 00830
+00913 if rtrm$(US%)=USER$ then 00960
+00916 goto 00908
+00917 let US%=USER$
+00918 let DTH,SCORE,KILLS=0
+00920 let BX=int(rnd*HOWFAR)-int(HOWFAR/2)
+00921 let BY=int(rnd*HOWFAR)-int(HOWFAR/2)
+00922 if BX=0 and BY=0 then 00920
+00925 let IM$=IM$&"  Your base is located at ("&str$(BX)&","&str$(BY)&")."
+00930 output #1 record USER data 00830
+00931 let NEWUSER=-1
+00932 goto 00960
+00960 if BX=0 and BY=0 then
+00961   print "It has been discovered that in your absence your starbase has been destroyed!";chr$(10);"The computers that held your score have been demolished."
+00962   goto 00920
+00963 end if
+00970 goto 05000
+00980 let DIS=1000
+00982 goto 01030
+01000 let DX=X2-X1                         ! Computer DEG&DIS for X1,Y1 & X2, Y2
+01010 let DY=Y2-Y1
+01020 let DIS=sqr(DX^2+DY^2)
+01030 if DX=0 then
+01040   let DEG=0
+01050   if DY>0 then let DEG=90
+01060   if DY<0 then let DEG=270
+01070   return
+01080 end if
+01090 if DY=0 and DX<0 then
+01100   let DEG=180
+01110   return
+01120 end if
+01130 let DEG=abs(atn(DY/DX)*180/pi)
+01140 if DX>0 and DY<0 then let DEG=360-DEG else if DX<0 and DY>0 then let DEG=180-DEG else if DX<0 and DY<0 then let DEG=DEG+180
+01170 return
+01200 let X2=int(cos(DEG*pi/180)*DIS+X1+.5)       ! compute X2,Y2 from X1,Y1
+01210 let Y2=int(sin(DEG*pi/180)*DIS+Y1+.5)       ! given DEG and DIS
+01220 return
+02000 if INORBIT=0 then                           ! Attack
+02001   print tab(1,23);"Attack may only be used while orbiting planets.  Use P to shoot ships.";chr$(11);
+02002   goto 07000
+02003 end if
+02004 let LST9=-1
+02005 input #2 record INORBIT data 00850
+02006 if SOWNER=USER then
+02007   print tab(1,23);"You already have control of that planet.  Increase control by orbiting!";chr$(11);
+02008   goto 07000
+02009 end if
+02010 input #2 record SHIP data 00850
+02012 print tab(1,23);"How much energy to attack with: ";chr$(11);
+02013 enable handler RESM, resume at 07000
+02014 linput prompt "", wait 10:N$
+02015 gosub 05800
+02016 print tab(1,23);chr$(11);
+02017 if ER<>0 or N<1 then 07000
+02020 if N>SENG then print tab(1,23);"Not Enough Energy In Reserves For Such An Attack";
+02021 if N>SENG then 07000
+02025 let SENG=SENG-N
+02027 output #2 record SHIP data 00850
+02030 input #2 record INORBIT data 00850
+02032 let SENG=SENG-int(N/100)
+02033 if SOWNER=0 then let SOWNER=-USER
+02034 output #2 record INORBIT data 00850
+02035 print tab(1,23);N;" units of energy used to attack hostile planet!";
+02036 let UPDATE=-1
+02037 if SENG>0 then 07000
+02038 let N$=""
+02040 let SENG=0
+02041 let SOWNER,IOWN=USER
+02042 let SENG=5000
+02043 output #2 record INORBIT data 00850
+02045 let URSCORE=URSCORE+250
+02050 print tab(1,23);"WE HAVE TAKEN THE PLANET!!  Enter the new name: ";
+02051 linput prompt chr$(11), wait 60:N$
+02052 if rtrm$(N$)="" then 02064
+02060 let SH%=rtrm$("O"&ltrm$(rtrm$(N$(1:20))))
+02062 output #2 record INORBIT data 00850
+02064 print tab(1,23);"Planet ";rtrm$(SH%(2:len(SH%)));" is ours!  DEFENSE VALUE is 5000";chr$(11);
+02066 goto 07000
+02400 let TMP$=""
+02401 for K=9 to 1 step -1          ! display messages  **CALL HERE FOR UPDATE**
+02402   let TMP$=TMP$&chr$(16)&chr$(0)&chr$(12+K)&VL$(K)&chr$(11)&chr$(3)&chr$(15)&chr$(29)&chr$(2)&chr$(21)
+02403 next K
+02404 print TMP$;
+02406 return
+02410 for K=1 to 8                               !add text message TM$ to screen
+02412   let VL$(K)=VL$(K+1)
+02414 next K
+02416 let VL$(9)=TM$       ! set text message  **text logging may be done here**
+02418 goto 02400                     ! and invoke a print - without another nest
+02420 mat VL$=nul$                                ! clear all entries
+02421 goto 02400                                  ! clear the screen
+02430 mat VL$=nul$                               ! clear screen - ready for help
+02431 let VL$(1)="W - Warp Drive      D - Set Degree     SPACE BAR - Halt Warp Engines"
+02432 let VL$(2)="R - Set Radio       M - Send Message   ERASE PG  - Clear Text"
+02433 let VL$(3)="? - Help            Q - Quit           ERASE EOL - Clear Status"
+02434 let VL$(4)="S - Shield Control  P - Phaser Banks   B - Base Location   A - Attack Planet"
+02435 let VL$(5)="I - Information     C - Eng Capsule    : - Transmittor"
+02437 let VL$(7)="F1 - Triangulator   F2 - Short Range Scan   F15 - Quit"
+02438 let VL$(8)="SF1- Redraw Screen  F5 - Point Calculator   F6  - Scan Ship"
+02439 goto 02400                                  ! show text
+02440 input #2 record SHIP data 00850             ! Dump Energy
+02441 if SWARP>=1 then print tab(1,23);chr$(11);"Ship can not deposit energy capsule during a warp drive.";
+02442 if SWARP>=1 then 07000
+02443 if SENG<=25000 then print tab(1,23);chr$(11);"Ship requires a minimum of 25000 before we may deposit energy.";
+02444 if SENG<=25000 then 07000
+02445 print tab(1,23);chr$(11);SENG-25000;"units of Energy available for capsule deposit.";
+02446 print tab(1,24);chr$(11);"How much energy to place in capsule for later retrieval: ";
+02447 enable handler RESM, resume at 07000
+02448 linput prompt "", wait 5:N$;
+02449 print tab(1,23);chr$(11);
+02450 gosub 05800
+02451 if ER<>0 then 07000
+02452 if N>100000 then let N=100000
+02453 if N<500 then print tab(1,23);chr$(11);"That would be pointless.";
+02454 if N<500 then 07000
+02460 if SENG-N<25000 then print tab(1,23);chr$(11);"That would leave the ship without enough energy.";
+02461 if SENG-N<25000 then 07000
+02462 let SENG=SENG-N
+02463 let X=SX
+02464 let Y=SY
+02465 let UPDATE=-1
+02466 output #2 record SHIP data 00850
+02467 let I=0
+02468 let I=I+1
+02469 input #2 eof 02471, record I data 00850
+02470 if SSTAT>0 or len(ltrm$(SH%)) then 02468
+02471 let SH%=", Stored Energy"
+02472 let SX=X+int(rnd*5)-3
+02473 let SY=Y+int(rnd*5)-3
+02474 let SOWNER=USER
+02475 let SENG=N
+02476 let SSTAT=3
+02477 output #2 record I data 00850
+02478 let TM$="Energy deposit of "&str$(N)&" units has been left floating in space."
+02479 gosub 02410
+02480 goto 07000
+02481 let I=0                        ! Drop A Transmitter At A Certain Frequency
+02482 let I=I+1
+02483 input #2 eof 02489, record I data 00850
+02484 if SSTAT<>3 or len(rtrm$(SH%))=0 then 02482
+02485 if SH%(1:1)=":" and SOWNER=USER then 02487
+02486 goto 02482
+02487 print tab(1,23);chr$(11);"You already have a transmitter in space at (";str$(SX);",";str$(SY);")  Frequency is ";str$(SENG);
+02488 goto 07000
+02489 print tab(1,23);chr$(11);"Specify frequency for transmitter to report activity: ";
+02490 linput prompt "[1-100]  ", wait 7:N$
+02491 gosub 05800
+02492 input #2 record SHIP data 00850
+02493 if ER<>0 or N<1 or N>100 or N<>int(abs(N)) then print tab(1,23);"Illegal Transmitter Frequency.";chr$(11); else if SR1<>N and SR2<>N and SR3<>N then print tab(1,23);chr$(11);"Be sure to set a radio channel to ";N;
+02494 if ER<>0 or N<1 or N>100 or N<>int(abs(N)) then 07000
+02496 let X=SX+int(rnd*5-3)
+02497 let Y=SY+int(rnd*5-3)
+02498 let I=0
+02499 let I=I+1
+02500 input #2 eof 02505, record I data 00850
+02501 if len(rtrm$(SH%))=0 then 02505
+02502 goto 02499
+02505 let SX=X
+02506 let SY=Y
+02507 let SOWNER=USER
+02508 let SENG=N
+02509 let SSTAT=3
+02510 let SH%=": "&str$(N)
+02511 let SR1,SR2=-9999
+02515 output #2 record I data 00850
+02516 let UPDATE=-1
+02517 goto 07000
+02550 input #4 eof 02565, record 1 data 00870
+02551 if LEOF=0 or LR=LEOF then return
+02552 if LR+1>COMLEN then let I=1 else let I=LR+1
+02553 input #3 eof 02565, record I data 00860     ! read last read+1
+02554 let LR=I
+02555 if PROCESS then gosub 02600        ! process the shared information update
+02556 goto 02550                                  ! keep setting flags etc
+02557 let LEOF=0                                  ! ** WRITE A RECORD OUT **
+02558 input #4 eof 02561, record 1 data 00870
+02559 disable handler
+02560 if SILENT=0 then let SFR=SHIP else let SFR=0
+02561 let LEOF=LEOF+1
+02562 if LEOF>COMLEN then let LEOF=1
+02563 output #4 record 1 data 00870               ! place new EOF note
+02564 output #3 record LEOF data 00860            ! write data
+02565 return
+02566 rem MTYP = 1  update your screens
+02567 rem MTYP = 2  radio communications
+02568 rem MTYP = 3  you've been hit by phasers!
+02569 rem MTYP = 4  award yourself these points
+02570 rem MTYP = 5  award yourself a kill
+02571 rem MTYP = 6  display the message on your screen - no header
+02600 if MTYP=1 and SFR<>SHIP then
+02601   let UPDATE=-1
+02603 end if
+02604 if MTYP=2 and GVAL>0 then                ! handle sub-space communications
+02605   let TM$="Message Received"
+02606   if SR1=GVAL or SR2=GVAL or SR3=GVAL then
+02607     if SFR>0 then
+02608       input #2 eof 02621, record SFR data 00850
+02609       let TM$=TM$&" from ship "&rtrm$(SH%)&"  "
+02610     end if
+02611     input #2 record SHIP data 00850
+02620     if SR1=GVAL then let TMP$="A" else if SR2=GVAL then let TMP$="B" else if SR3=GVAL then let TMP$="C" else let TMP$="Unknown"
+02621     let TM$=TM$&" -- On Frequency "&str$(GVAL)&" Channel "&TMP$
+02622     gosub 02410
+02623     let TM$=rtrm$(TEXT%)
+02624     gosub 02410
+02625   else
+02627     if SR1=0 or SR2=0 or SR3=0 then
+02632       if rnd>.85 and SR1<>GVAL and SR2<>GVAL and SR3<>GVAL and GVAL>1 then
+02635         let TM$="Communications Computer Reports Possible Communications on Frequency "&str$(GVAL)
+02640         gosub 02410
+02645       end if
+02658     end if
+02659   end if
+02660 end if
+02690 if MTYP=3 and STO=SHIP then
+02691   if SFR<1 and IOWN=USER and INORBIT<>0 then return
+02692   let NORELEASE=TURN+15
+02693   let NRS=-1
+02701   let TM$=rtrm$(TEXT%)
+02702   gosub 02410
+02703   let DAM=GVAL
+02704   let DESHIP=SFR
+02705   let PDR$=" hit with "&str$(DAM)&" units."
+02706   input #2 record SHIP data 00850
+02707   let I=SSHLD*2
+02708   if DAM-I<=0 then
+02709     let TM$="Shields absorbed blast."
+02710     if int(SSHLD-int(DAM/2))<=int(SSHLD/3.5) then gosub 06200
+02711     let SSHLD=SSHLD-int(DAM/2)
+02712     if SSHLD=0 then let PDR$=PDR$&"  SHIELDS ARE DOWN!!!" else if SSHLD<1000 then let PDR$=PDR$&"  SHIELDS BUCKLING..!" else if SSHLD<500 then let PDR$=PDR$&"  SHIELDS WEAK!" else let PDR$=PDR$&"  SHIELDS HOLDING..."
+02713     if DAM<1 then let TM$="We just received a warning shot!" else if SSHLD*2<SENG/2 then let TM$=TM$&"  We can only widthstand a blast of "&str$(SSHLD*2)&" units."
+02714     output #2 record SHIP data 00850
+02715     let AWARD=int(DAM/50)
+02716     gosub 02910                             ! point award
+02717     if DAM*3>SENG then gosub 06200
+02718     gosub 02410
+02719     let TEXT%=PDR$
+02720     let STO=DESHIP
+02721     let MTYP=7
+02722     gosub 02557
+02723     return
+02724   end if
+02725   let DAM=DAM-I
+02726   let SSHLD=0
+02727   if DAM>0 then let SENG=SENG-2.3*DAM
+02728   output #2 record SHIP data 00850
+02729   if SFR>0 then input #2 record SFR data 00850
+02730   if SFR>0 then let IM$="You were killed by "&rtrm$(SH%) else let IM$="You were demolished by planetary fire!"
+02731   let AWARD=int(DAM/30)
+02732   input #2 record SHIP data 00850
+02733   gosub 02910                               ! point award
+02734   if DAM>0 then let TM$="** CRITICAL HIT **   in Energy Level Dropped "&str$(int(DAM*2.3))&" unit(s)." else let TM$="A warning shot was fired upon us...  "&chr$(14)&"CHECK SHIELDS"&chr$(15)
+02735   gosub 02410
+02736   let MTYP=7
+02737   let TEXT%=PDR$&"  >NO SHIELDS-CRITICAL HIT<"
+02738   let STO=DESHIP
+02739   gosub 02557
+02740   if DAM>100 or DAM>SENG then gosub 06200
+02741   if SENG<0 then gosub 02960
+02751   gosub 05575
+02752   return
+02760 end if
+02770 if MTYP=4 and STO=SHIP then
+02771   input #2 record SFR data 00850
+02772   if SOWNER=USER then return
+02775   let URSCORE=URSCORE+GVAL
+02780   gosub 05586
+02785   return
+02790 end if
+02795 if MTYP=5 and STO=SHIP then
+02796   input #2 record SFR data 00850
+02797   if SOWNER=USER then
+02798     print tab(1,23);"You blew up one of your own ships!!!";chr$(11);
+02799     return
+02800   end if
+02804   let URKILL=URKILL+1
+02805   let TM$=rtrm$(TEXT%)
+02806   let URSCORE=URSCORE+GVAL
+02807   gosub 02410
+02808   let TM$="You stole "&str$(GVAL)&" score point(s)!"
+02810   if GVAL>0 then gosub 02410
+02815   gosub 05586
+02816   let NORELEASE=TURN
+02820   print tab(1,23);chr$(14);"C O N G R A T U L A T I O N S ! ! !     C A P T A I N ! ! !";chr$(15);chr$(30);"FF";
+02821   if SFR<1 then return
+02822   input #2 record SFR data 00850
+02823   let SH%=""
+02824   output #2 record SFR data 00850
+02825 end if
+02830 if MTYP=6 then
+02831   if STO=0 or STO=SHIP then
+02832     let TM$=rtrm$(TEXT%)
+02833     gosub 02410
+02834   end if
+02835 end if
+02838 if MTYP=7 then                              ! display message if near by
+02839   let OLDDISX=DIS
+02841   if STO=0 or STO=SHIP then               ! and computers and sensors work
+02842     input #2 record SFR data 00850
+02843     let X2=SX
+02844     let Y2=SY
+02845     let TM$=rtrm$(SH%)&" "
+02846     input #2 record SHIP data 00850
+02847     let X1=SX
+02848     let Y1=SY
+02849     gosub 01000
+02850     let TM$=TM$&rtrm$(TEXT%)
+02851     if DIS>12 then 02853
+02852     if SFR<>SHIP and SD(6)<1 and SD(2)<1 then gosub 02410
+02853   end if
+02854   let DIS=OLDDISX
+02855 end if
+02900 return                                      ! general event return
+02910 if AWARD<1 then return
+02911 let TEXT%="Point Award"
+02912 let GVAL=AWARD
+02922 let STO=DESHIP
+02932 let MTYP=4
+02942 gosub 02557
+02952 return
+02960 let TEXT%="Congratulations!  You have just destroyed "&SH%
+02961 let MTYP=5
+02962 let STO=DESHIP
+02963 input #2 record SHIP data 00850
+02964 let SH%=""
+02965 let SSTAT=0
+02966 output #2 record SHIP data 00850
+02967 let GVAL=int(URSCORE/3)
+02970 gosub 02557
+02971 return
+03000 if MANAGER<>0 then 03009
+03001 print "%GALAXY-Warning, Insufficient access for command"
+03003 goto 05100
+03009 let SC$=chr$(12)&chr$(28)
+03010 for I=0 to 22
+03012   if I<>11 then let SC$=SC$&chr$(16)&"'"&chr$(I)&"|"
+03014 next I
+03016 let SC$=SC$&chr$(16)&chr$(1)&chr$(11)&rpt$("-",38)&"+"&rpt$("-",39)
+03019 let SHPCNT=0
+03020 let RANGEX,RANGEY=10
+03030 let I=0
+03035 let I=I+1
+03040 input #2 eof 03100, record I data 00850
+03041 if SSTAT=0 or SSTAT=2 or rtrm$(SH%)="" then 03035
+03050 if abs(SX)>RANGEX then let RANGEX=abs(SX)
+03052 if abs(SY)>RANGEY then let RANGEY=abs(SY)
+03060 goto 03035
+03100 let I=0
+03102 let I=I+1
+03104 input #2 eof 03200, record I data 00850
+03106 if SSTAT<>3 or rtrm$(SH%)="" then 03102
+03108 if abs(SX)>RANGEX or abs(SY)>RANGEY then 03102
+03110 let SC$=SC$&chr$(16)&chr$(int((SX+RANGEX+1)/(RANGEX*2+1)*79))&chr$(22-int((SY+RANGEY+1)/(RANGEY*2+1)*22))&SH%(1:1)
+03112 goto 03102
+03200 let I=0
+03201 let SC$=SC$&chr$(29)
+03202 let I=I+1
+03204 input #2 eof 03300, record I data 00850
+03205 if rtrm$(SH%)="" or SSTAT<>1 then 03202
+03206 if abs(SX)>RANGEX or abs(SY)>RANGEY then 03202
+03210 let SC$=SC$&chr$(16)&chr$(int((SX+RANGEX+1)/(RANGEX*2+1)*79))&chr$(22-int((SY+RANGEY+1)/(RANGEY*2+1)*22))&"A"
+03212 let SHPCNT=SHPCNT+1
+03220 goto 03202
+03300 print SC$;tab(1,24);"Total Ships in Space is ";SHPCNT;"          <-";RANGEX;"->   ^-";RANGEY;"-v";tab(40,12);
+03302 enable handler RESM, resume at 03000
+03310 linput prompt "", bytes 1, noecho, wait 5:A$
+03311 if A$=" " then print chr$(12);tab(1,24);"..computing..";
+03312 if A$=" " then 03000
+03315 disable handler
+03890 print chr$(12);
+03900 goto 05100
+04000 let TS=time
+04020 let TU,GU,TP,I,ER,UJ=0
+04030 let ER=ER+1
+04040 let I=I+1
+04041 enable handler RESM, resume at 04030
+04050 if ER>10 then 04140
+04060 who I into A$
+04070 let TP=TP+1
+04080 if pos(A$,":GALAXY.PR")<>0 then let GU=GU+1
+04090 if pos(A$,":CON")<>0 and pos(A$,":CLI.PR")<>0 then let TU=TU+1
+04100 let A$=A$(8:30)
+04110 let J=pos(A$,":")
+04111 enable handler RESM, resume at 04130
+04120 if val(rtrm$(ltrm$(A$(J+1:len(A$)))))=I then let UJ=UJ+1
+04130 goto 04040
+04140 let TD=time-TS
+04150 disable handler
+04160 return
+04170                             ! Gosub 4000 - Benchmark and stastics gatherer
+04180 ! TP = total processes    TU = total users    UJ = jobs belonging to users
+04190        ! GU = total galaxy usrs  TD = time difference benchmark in seconds
+05000 print chr$(12);chr$(20);"GALAXY COMPUTER";chr$(21);tab(54,2);"THIS SESSION";
+05002 randomize
+05003 runtime into A$
+05004 print A$(8:16)
+05005 if NEWUSER<>0 then print tab(25,1);"Welcome New User";
+05006 characteristics "OFF","NRM"
+05010 print tab(58,1);date$;" ";time$;
+05011 gosub 04000
+05020 print tab(1,3);"+- 0% -------------------------------------- 100% -+"
+05025 for I=1 to 4
+05030   print "|";tab(52);"|"
+05031   print "+";rpt$("-",50);"+"
+05032 next I
+05060 print tab(2,4);rpt$("*",int(TU/TP*50));chr$(11);tab(52,4);"|  User Processes: ";str$(int(TU/TP*100));"% [";str$(TU);"]";
+05061 print tab(2,6);rpt$("*",int(GU/TU*50));chr$(11);tab(52,6);"|  Galaxy Users:   ";str$(int(GU/TU*100));"% [";str$(GU);"]";
+05062 print tab(2,8);rpt$("*",int(UJ/TP*50));chr$(11);tab(52,8);"|  User Jobs:      ";str$(int(UJ/TP*100));"%";
+05063 print tab(2,10);rpt$("*",int(GU/TP*50));chr$(11);tab(52,10);"|  Galaxy Usage:   ";str$(int(GU/TP*100));"%";
+05065 if URSCORE>0 then print tab(1,13);"You have just earned";URSCORE;"points and brought your score up to ";str$(SCORE);".";
+05066 if URKILL>0 then print tab(1,14);"You have just earned";URKILL;" kill(s) and brought your kills up to ";str$(KILLS);".";
+05067 if IM$<>"" then print tab(1,15);IM$
+05068 let IM$=""
+05095 print tab(1,17);
+05096 let URKILL,URSCORE=0
+05100 enable handler RESM, resume at 99920
+05102 linput prompt chr$(10)&"GALAXY> ", wait 60*5:G$
+05103 input #1 record USER data 00830
+05110 let G$=uprc$(ltrm$(rtrm$(G$)))
+05112 if G$="" and term$=chr$(12) then 05000
+05113 if G$="" then 05100
+05114 let I=pos(G$,"/")
+05115 if I>0 then
+05116   let TEMP$=G$(I:len(G$))
+05117   let G$=G$(1:I-1)&" "&TEMP$
+05118 end if
+05121 if G$="?" then 05200
+05122 let I=pos(G$," ")
+05123 if I=0 then let I=len(G$)+1
+05125 let GA$=ltrm$(rtrm$(G$(I+1:len(G$))))
+05126 let G$=ltrm$(rtrm$(G$(1:I-1)))
+05130 let G=len(G$)
+05140 if G>1 and G<4 and LEFT$("BYE",G)=G$ then 99920
+05141 if G>0 and G<5 and LEFT$("EXIT",G)=G$ then 99920
+05142 if G>0 and G<5 and LEFT$("QUIT",G)=G$ then 99920
+05143 if G>1 and G<5 and LEFT$("STOP",G)=G$ then if USER$="PER.STONEY" then stop else 99920
+05144 if G>0 and G<5 and LEFT$("HELP",G)=G$ then 05200
+05145 if G>0 and G<5 and LEFT$("PLAY",G)=G$ then 05398
+05146 if G>1 and G<6 and LEFT$("BUILD",G)=G$ then 05269
+05150 if G>0 and G<8 and LEFT$("MONITOR",G)=G$ then 05000
+05152 if G>0 and G<6 and G$=LEFT$("USERS",G) then 05210
+05153 if G>1 and G<6 and LEFT$("SHIPS",G)=G$ then 05238
+05155 if G>1 and G<4 and LEFT$("NEW",G)=G$ then 00920
+05156 if G>1 and G<7 and LEFT$("GALAXY",G)=G$ then 03000
+05160 print "Unknown command.  Type HELP for commands."
+05170 goto 05100
+05200 print chr$(12);chr$(20);"Galaxy Commands";chr$(21)
+05201 print "BUILD    - Build A Ship"
+05202 print "PLAY     - Enter Space With A Built Ship";chr$(10);"NEW      - Make a new location for your base.";chr$(10)
+05203 print "USERS    - See Other Users Of Galaxy"
+05204 if MANAGER<>0 then print "SHIPS    - Examine Ships (/ALL) and Owners (/OWNER)" else if PRIV<>0 then print "SHIPS    - Examine Ships (/ALL)" else print "SHIPS    - Examine your ships"
+05205 print chr$(10);"MONITOR  - Examine Data General Response Time"
+05206 print "BYE      - Leave Galaxy";chr$(10);chr$(10)
+05207 print "   To use GALAXY, first BUILD a ship with the build command.  You may build as";chr$(10);"many as you like.  Then PLAY a ship you have built.  Note that you may use"
+05208 print "more than one terminal at a time.  Fly your ship in space and join other players";chr$(10);"in battle.  Objective: score points and keep from getting killed.";chr$(10)
+05209 goto 05100
+05210 let I=0                                    ! display users who used galaxy
+05211 print chr$(12);chr$(20);"Galaxy User List";chr$(21);tab(30,1);"SCORE";tab(40,1);"KILLS";tab(50,1);"DEATHS"
+05215 disable handler
+05220 let I=I+1
+05230 input #1 eof 05100, record I data 00830
+05231 if rtrm$(US%)<>"" then print rtrm$(US%);tab(30);SCORE;tab(40);KILLS;tab(50);DTH
+05235 goto 05220
+05238 print chr$(12);chr$(20);"SHIPS";chr$(21)
+05239 let I=0
+05240 let I=I+1
+05241 input #2 eof 05100, record I data 00850
+05242 if rtrm$(SH%)="" then 05240
+05243 if SSTAT>2 then if USER$<>"PER.STONEY" or pos(GA$,"/OBJ")=0 then 05240
+05245 if SOWNER<>USER and pos(GA$,"/A")=0 then 05240
+05246 if MANAGER<>0 or PRIV<>0 or SOWNER=USER then print SH%; else goto 05240
+05248 if pos(GA$,"/R")<>0 and SSTAT=1 then
+05249   let SSTAT=2
+05250   output #2 record I data 00850
+05251 end if
+05252 if USER$="PER.STONEY" and pos(GA$,"/D")>0 then print using "REC #### ":I;
+05260 if SOWNER=USER or pos(GA$,"/A")>0 and MANAGER<>0 then print "  (";str$(SX);",";str$(SY);")";tab(41);"Eng:";SENG; else print "- Classified -";
+05261 print tab(53);
+05262 if pos(GA$,"/O")>0 and MANAGER<>0 then 05265 else if SSTAT=0 then print "Docked at Base"; else if SSTAT=1 then print "Flying in Space"; else if SSTAT=2 then print "Sleeping in Space"; else print "Status Unknown";
+05263 print chr$(29)
+05264 goto 05240
+05265 if SOWNER>0 then input #1 record SOWNER data 00830
+05266 let TMP$=rtrm$(US%)
+05267 if SOWNER<1 or TMP$<>"" then print TMP$; else print "-No Owner-";
+05268 goto 05263
+05269 enable handler RESM, resume at 05100        ! build a ship
+05270 if GA$="" then linput prompt "Ship Name: ", wait 60:SH$ else let SH$=GA$
+05271 disable handler
+05272 let SH$=uprc$(ltrm$(rtrm$(SH$)))
+05273 let SH$=SH$(1:20)
+05274 if SH$="" then 05100
+05275 for I=1 to len(SH$)
+05276   if pos("ABCDEFGHIJKLMNOPQRSTUVWXYZ 1234567890",SH$(I:I))=0 then 05288
+05277 next I
+05278 goto 05291
+05288 print "That ship name has illegal characters that may confuse the computer."
+05289 goto 05100
+05291 let SHIP,I=0
+05292 let I=I+1
+05293 input #2 eof 05369, record I data 00850
+05294 if rtrm$(SH%)="" then let SHIP=I
+05295 if rtrm$(SH%)="" then 05292
+05296 if SH$(1:3)<>SH%(1:3) and LEFT$(rtrm$(SH%),len(SH$))<>SH$ and LEFT$(SH$,len(rtrm$(SH%)))<>rtrm$(SH%) then 05292
+05298 if rtrm$(SH%)=SH$ then print "Another ship by that name already exists." else print "Another ship exists with a name close to that.  Be more unique!"
+05368 goto 05100
+05369 if SHIP=0 then let SHIP=I
+05372 let SSTAT=0                                 ! not in game
+05374 let SR1=1
+05375 let SR2,SR3=0
+05376 let SSHLD=0                                 ! no shields
+05377 let SSHMX=25000                             ! shield maximum
+05378 mat SD=zer
+05380 let SX=int(rnd*6)-3+BX
+05382 let SY=int(rnd*6)-3+BY
+05383 let SOWNER=USER
+05385 let SWARP,SDEG=0
+05386 let SH%=SH$
+05390 let SENG=50000                              ! ships start energy
+05391 let SMAXENG=70000                           ! maximum enegry
+05392 let SENGREG=100                             ! energy regeneration rate
+05393 let SWCOST=100                              ! cost for using warp drive
+05395 output #2 record SHIP data 00850
+05396 print "Your ship, ";SH$;", has been constructed."
+05397 goto 05100
+05398 enable handler RESM, resume at 05100
+05399 let QUITTING=-1
+05401 if GA$="" then linput prompt "Ship to play: ", wait 60:SH$ else let SH$=GA$
+05402 let SH$=uprc$(ltrm$(rtrm$(SH$)))
+05403 let SH$=SH$(1:20)
+05404 let INORBIT,TEMP,TURN,URKILL,URSCORE,NORELEASE,NRS=0    ! unrecorded score
+05405 let SHIP=0
+05406 if SH$="" then 05401
+05407 let SHIP=SHIP+1
+05408 input #2 eof 05411, record SHIP data 00850
+05409 if SH$=rtrm$(SH%) then 05413
+05410 goto 05407
+05411 print "No such ship exists."
+05412 goto 05100
+05413 if SSTAT>0 and SSTAT<>2 then
+05414   print "That ship is already in play.  If ship is stuck type SHIPS/RESET."
+05415   goto 05100
+05416 end if
+05417 if SOWNER<>USER then
+05418   print "Galaxy Computer Records Indicate You Do Not Have Ownership Of That Vessel."
+05419   goto 05100
+05420 end if
+05421 let WARP=SWARP
+05422 let DEG=SDEG
+05423 let X=SX
+05424 let Y=SY
+05425 let LST1,LST2,LST3,LST4,LST5,LST6,LST7,LST8=-1.1 ! last items for text save
+05426 mat VL$=nul$
+05427 let OLDSC$=""
+05435 let SSTAT=1                                 ! put ship in play
+05436 let LSTENG=SENG                             ! last energy reading
+05437 output #2 record SHIP data 00850
+05438 let MTYP=1
+05439 let STO=0
+05440 let GVAL=0
+05441 let TEXT%=SH$&" is in play"
+05442 gosub 02557                                 ! force event entry update
+05443 let PROCESS=0                               ! no checking shared files
+05444 gosub 02550
+05445 let PROCESS=-1                              ! check files now
+05449 goto 05965
+05450 input #2 record SHIP data 00850             ! leave game with Q
+05452 let X1=SX
+05453 let Y1=SY
+05454 let X2=BX
+05455 let Y2=BY
+05456 gosub 01000                                 ! get deg and dis
+05457 if DIS>3 or TURN<NORELEASE then
+05458   if URSCORE>0 or URKILL>0 then let IM$=chr$(14)&"You QUIT without being docked at your starbase!  *NO SCORE AWARDED*"&chr$(15)&chr$(7) else let IM$="Becareful when you don't dock...!"
+05459   if TURN<NORELEASE and NRS=1 then let IM$="You QUIT after engaging in combat - this is considered cheating!"&chr$(10)&"No Score Awarded and a 250 point peanlty!"
+05460   if TURN<NORELEASE and NRS=-1 then let IM$="You QUIT after being fired upon - this is considered cheating!"&chr$(10)&"No Score Awarded and a 250 point peanlty."
+05462   let URSCORE,URKILL=0
+05463   let SSTAT=2                               ! left game, but not docked
+05464 else
+05465   mat SD=zer
+05466   let IM$="Ship docked safely at starbase.  Repairs will be done by the time you"&chr$(10)&"are ready to fly again."
+05467   if SENG<25000 then let SENG=25000
+05469   let SSTAT=0
+05470 end if
+05471 output #2 record SHIP data 00850
+05472 let MTYP=1
+05473 let STO=0
+05474 let TEXT%=SH$&" is out of play"
+05475 gosub 02557                                 ! force update for exit event
+05476 input #1 record USER data 00830
+05477 if TURN<NORELEASE then let SCORE=SCORE-250 else let SCORE=SCORE+URSCORE
+05480 let KILLS=KILLS+URKILL
+05481 output #1 record USER data 00830
+05482 goto 05000
+05500 let SC$=""
+05501 let UPDATE=0                                ! no need to update
+05502 input #2 record SHIP data 00850
+05503 let X,X1=SX
+05504 let Y,Y1=SY
+05505 if SD(1)>=1 then 05517
+05507 for R=-5 to 5                          ! show galaxy at co-ordinates (X,Y)
+05508   let TEMP$=chr$(16)&chr$(1)&chr$(R+6)
+05509   for C=-5 to 5
+05510     let I=int((FNS(Y-R,X+C)-int(FNS(Y-R,X+C)))*100)
+05511     if I>2 and I<20 then let TEMP$=TEMP$&". " else let TEMP$=TEMP$&"  "
+05512     if Y-R=BY and X+C=BX then let TEMP$=TEMP$(1:len(TEMP$)-2)&"B "
+05513     if SD(1)>0 and SD(1)/5>rnd then let TEMP$=TEMP$(1:len(TEMP$)-2)&"~ "
+05514   next C
+05515   let SC$=SC$&TEMP$(1:len(TEMP$)-1)
+05516 next R
+05517 let I=0
+05518 input #2 record SHIP data 00850
+05519 if SRS<>0 and SD(2)>1 then
+05520   let TM$="The Short Range Scanner is severely damaged and can not be used."
+05521   gosub 02410
+05522   let SRS=0
+05523 end if
+05524 let SRSDAM=SD(1)
+05525 let MYENG=SENG
+05526 let I=I+1
+05527 input #2 eof 05559, record I data 00850
+05528 if SSTAT=0 or SSTAT=2 or rtrm$(SH%)="" or I=SHIP then 05526
+05529 if SH%(1:1)="O" then gosub 05717
+05530 let X2=SX
+05531 let Y2=SY
+05532 gosub 01000                                 ! compute DEG & DIS
+05533 if SRS<>0 and MYENG-75<=0 then
+05534   print tab(1,23);"Not enough energy for short range scan.";chr$(11);
+05535   let SRS=0
+05536 end if
+05537 if SSTAT=1 and DIS<=75 and SRS<>0 and SRSDAM<rnd then
+05538   let TM$="Located: "&rtrm$(SH%)&" at ("&str$(SX)&","&str$(SY)&")  Deg: "&str$(DEG)&" Dis: "&str$(DIS)
+05539   gosub 02410
+05540 end if
+05541 if SSTAT=1 then let VDS$="K" else let VDS$=SH%(1:1)
+05542 if SSTAT=3 and DIS<50 and SRS<>0 and SRSDAM<rnd then
+05543   let TM$="-Unknown Object-"
+05544   if SH%(1:1)="O" then let TM$="Planet: "&rtrm$(SH%(2:len(SH%))) else if SH%(1:1)="*" then let TM$="Sun:    "&rtrm$(SH%(2:len(SH%)))
+05545   if SH%(1:1)="," then if SOWNER=USER then let TM$="Our Energy Capsule" else let TM$="Enemy Energy Capsule"
+05546   if SH%(1:1)=":" then if SOWNER=USER then let TM$="Our Transmitting Sensor Becon" else let TM$="An Enemy Transmitting Beacon"
+05547   if SH%(1:1)="H" then if int(SX/2)=SX/2 then let TM$="A Hyperspace Port" else let TM$="Changes in space fabric"
+05548   if SH%(1:1)="@" then if int(SY/2)=SY/2 then let TM$="A Strange Sphere" else let TM$="Pulsating Object"
+05549   if SH%(1:1)="$" then if int(SX/2)=SX/2 then let TM$="Ship Debris" else let TM$="Debris"
+05550   if SH%(1:1)="E" then if int(SX/2)=SX/2 then let TM$="Energy Fluctuations" else let TM$="Ship Debris"
+05551   if TM$<>"" then let TM$=TM$&"  ("&str$(SX)&","&str$(SY)&")  Deg: "&str$(DEG)&"  Dis: "&str$(DIS)
+05552   if SSTAT=3 and SH%(1:1)="O" and SOWNER=USER then let TM$=TM$&"  DEF "&str$(SENG)
+05555   if TM$<>"" then gosub 02410
+05556 end if
+05557 if abs(X-SX)<=5 and abs(Y-SY)<=5 then if SRSDAM=0 and rnd>SRSDAM then let SC$(FNSC(SX-X,Y-SY):FNSC(SX-X,Y-SY))=VDS$ else let SC$(FNSC(SX-X,Y-SY):FNSC(SX-X,Y-SY))="~"
+05558 goto 05526
+05559 input #2 record SHIP data 00850
+05560 let SC$=SC$&chr$(16)&chr$(11)&chr$(6)&"A"
+05561 if SD(1)>=1 then print tab(5,7);chr$(22);chr$(14);"* NOT WORKING *";chr$(15);chr$(2); else if SC$<>OLDSC$ then print SC$;
+05562 let OLDSC$=SC$
+05563 if SRS<>0 then
+05564   let SENG=SENG-75
+05565   output #2 record SHIP data 00850
+05566 end if
+05567 let SRS=0
+05568 input #2 record SHIP data 00850
+05569 if SX<>LST7 or SY<>LST8 then print tab(39,1);"(";str$(SX);",";str$(SY);")           "; !data info
+05570 if LST9<>INORBIT and INORBIT=0 then print tab(25,2);"Warp Factor: ";chr$(11);
+05571 if LST9<>INORBIT and INORBIT>0 then if IOWN=0 then print tab(25,2);"Orbiting Neutral Planet";chr$(11); else if IOWN=USER then print tab(25,2);"Orbiting Friendly Planet";chr$(11); else print tab(25,2);"Orbiting Hostile Planet";chr$(11);
+05572 if LST1<>SWARP or LST9<>INORBIT then if INORBIT=0 then print tab(38,2);SWARP;chr$(11);
+05573 input #2 record SHIP data 00850
+05574 if LST2<>SDEG then print tab(38,3);SDEG;chr$(11);
+05575 if LST3<>SENG then
+05576   print tab(38,5);SENG;
+05577   if SENG<100 then print chr$(14);"* DANGEROUSLY LOW *";chr$(15); else if SENG<500 then print "* CRITICALLY LOW *"; else if SENG<1000 then print "* CRITICALLY LOW *"; else if SENG<2000 then print "* VERY LOW *";
+05578   print chr$(11);
+05579 end if
+05580 if LST4<>SSHLD then print tab(38,7);SSHLD;chr$(11);
+05581 if LST4<>SSHLD and SSHLD>SSHMX then print tab(47);"*OVERLOAD*";
+05582 let LST1=SWARP
+05583 let LST2=SDEG
+05584 let LST3=SENG
+05585 let LST4=SSHLD
+05586 if LST5<>URSCORE or LST6<>URKILL then print tab(38,9);format$(URSCORE,"########");tab(60,9);URKILL;tab(60,24);">SCORE AWARD<";
+05587 let LST5=URSCORE
+05588 let LST6=URKILL
+05589 let LST7=SX
+05590 let LST8=SY
+05591 let LST9=INORBIT
+05592 print tab(63,1);date$;" ";time$;
+05593 return
+05594 let I=0                                     ! check bumps and range
+05595 if X>UNIVERSE then let X,I=-UNIVERSE
+05596 if X<-UNIVERSE then let X,I=UNIVERSE
+05597 if Y<-UNIVERSE then let Y,I=UNIVERSE
+05598 if Y>UNIVERSE then let Y,I=-UNIVERSE
+05599 if I<>0 then
+05610   let TM$="Ships Navigational Computer Reports A Strong Warp In Space"
+05611   gosub 02410
+05613   if WARP>2 then
+05617     let SWARP=int(SWARP/2)
+05622     let TM$="Warp Velocity Has Just Dropped To Half Speed"
+05627     let SENG=SENG-SWARP*SWCOST*1.3
+05628     let IM$="Your ship collided during computed re-entry and phased out."
+05632     let TM$="Engine Room Reports Sudden Energy Loss Of "&str$(SWARP*SWCOST*10.3)
+05637     gosub 02410
+05638   end if
+05639 end if
+05640 output #2 record SHIP data 00850
+05642 let I=0
+05647 disable handler
+05652 let I=I+1
+05657 input #2 eof 05667, record I data 00850
+05658 if SSTAT=0 or SSTAT=2 or rtrm$(SH%)="" or I=SHIP then 05652
+05659 if SH%(1:1)=":" and SOWNER<>USER then gosub 05693
+05660 if SH%(1:1)="O" then gosub 05693            ! Move the planet
+05663 if X=SX and Y=SY then if SSTAT<>3 then 05670 else 05825
+05664 goto 05652
+05667 input #2 record SHIP data 00850
+05668 return
+05670 let TM$="** WARP COLLISION AT ("&str$(X)&","&str$(Y)&") ***"
+05671 gosub 02410
+05672 let TM$="Warp Engines Shut Down!  Computer Recomputing Re-Entry"
+05673 gosub 02410
+05675 input #2 record SHIP data 00850
+05680 let X=X+rnd*11-5
+05682 let Y=Y+rnd*11-5
+05685 let SENG=SENG-.7*SWCOST*WARP
+05690 let SWARP=0
+05691 output #2 record SHIP data 00850
+05692 goto 05594                                  ! recheck re-entry failure
+05693 let X1=SX                                   ! Check DIS on Transmitter
+05694 let Y1=SY
+05695 let SAVEI=I
+05696 input #2 record SHIP data 00850
+05697 let X2=SX
+05698 let Y2=SY
+05699 gosub 01000
+05700 let I=SAVEI
+05701 input #2 record SAVEI data 00850
+05702 let GVAL=SENG
+05703 if DIS>100 then return
+05704 if abs(SR1-X)<20 and abs(SR2-Y)<20 then return
+05705 if SH%(1:1)="O" then 05717
+05706 input #2 record SHIP data 00850
+05707 let SILENT=-1
+05708 let TEXT%="Ship Sighting Reported at ("&str$(X)&","&str$(Y)&")  Deg: "&str$(DEG)&"  Dis: "&str$(DIS)
+05709 let MTYP=2
+05710 gosub 02557
+05711 let SILENT=0
+05712 input #2 record SAVEI data 00850
+05713 let SR1=X2
+05714 let SR2=Y2
+05715 output #2 record SAVEI data 00850
+05716 return
+05717 let ALPHA=time/43200*pi*SWCOST              ! Planet Orbit
+05718 let TMPX=int(SSHLD*cos(ALPHA+SDEG)*SR3+SR1)
+05719 let TMPY=int(SSHMX*sin(ALPHA+SDEG)*SR3+SR2)
+05720 let TMPFORX=X
+05721 let TMPFORY=Y
+05722 let TMPFORX1=X1
+05723 let TMPFORY1=Y1
+05724 if TMPX<>SX or TMPY<>SY then
+05725   if rnd>.8 then let SENG=SENG+5
+05726   if INORBIT=I then let SENG=SENG+7
+05727   let SX=TMPX
+05728   let SY=TMPY
+05729   output #2 record I data 00850
+05730   let UPDATE=-1
+05731   let LST7,LST8=UNIVERSE+2
+05732 end if
+05733 if INORBIT=I then
+05734   input #2 record SHIP data 00850
+05735   let SX=TMPX
+05736   let SY=TMPY
+05738   if SENG<SMAXENG then if IOWN=USER then let SENG=SENG+250 else if rnd>.5 then let SENG=SENG+25
+05739   output #2 record SHIP data 00850
+05740   if IOWN=USER and rnd>.5 then gosub 06405  ! repair something
+05741   input #2 record INORBIT data 00850
+05742   let SENG=SENG+1
+05743   output #2 record INORBIT data 00850
+05744   if URSCORE>0 or URKILL>0 and IOWN=USER then
+05745     input #1 record USER data 00830
+05746     let SCORE=SCORE+URSCORE
+05747     let KILLS=KILLS+URKILL
+05748     output #1 record USER data 00830
+05749     let TM$="PLANET HAS REPORTED YOUR SCORE TO GALAXY COMPUTER"
+05750     gosub 02410
+05751     let TM$="Total Score: "&str$(SCORE)&"   Total Kills: "&str$(KILLS)&"  Total Deaths: "&str$(DTH)
+05752     gosub 02410
+05753     let URSCORE,URKILL=0
+05754   end if
+05760 end if
+05761 if INORBIT=I and IOWN<>USER and IOWN<>0 and rnd>.65 then
+05762   input #2 record INORBIT data 00850
+05763   let ER=int(rnd*SENG)
+05764   let SENG=SENG-ER/50
+05765   output #2 record I data 00850
+05766   let MTYP=3
+05767   let STO=SHIP
+05768   let SFR=-1
+05769   let TEXT%="** Planet "&rtrm$(SH%(2:len(SH%)))&" fired "&str$(ER*3)&" units at us!!"
+05770   let SILENT=-1
+05771   let GVAL=ER*3
+05772   gosub 02557
+05773   let SILENT=0
+05774   if SOWNER<1 then 05779
+05775   input #1 record SOWNER data 00830
+05776   let SCORE=SCORE+int(rnd*5)
+05777   output #1 record SOWNER data 00830
+05778   input #1 record USER data 00830
+05779 end if
+05780 let X=TMPFORX
+05781 let Y=TMPFORY
+05782 let X1=TMPFORX1
+05783 let Y1=TMPFORY1
+05784 return
+05800 enable handler RESM, resume at 05820        ! convert N$ to N
+05801 let ER=0
+05802 let N=val(N$)
+05803 return
+05820 let ER=-1
+05821 let N=0
+05822 return
+05825 input #2 record I data 00850                ! Special Objects
+05826 if SH%(1:1)="H" then                        ! Hyperspace
+05827   input #2 record I data 00850
+05828   let X,SX=rnd*500-250
+05829   let Y,SY=rnd*500-250
+05830   output #2 record I data 00850
+05831   input #2 record SHIP data 00850
+05832   let X,SX=X+rnd*20-10
+05833   let Y,SY=Y+rnd*20-10
+05834   let SENG=SENG*.9
+05838   output #2 record SHIP data 00850
+05839   let TM$="Ship Has Run Into A Hyper Space Portal"
+05840   gosub 02410
+05841   goto 05594
+05842 end if
+05843 if SH%(1:1)="E" then                        ! Extra Energy
+05844   input #2 record I data 00850
+05845   let SX=rnd*1000-500
+05846   let SY=rnd*1000-500
+05847   output #2 record I data 00850
+05848   input #2 record SHIP data 00850
+05849   if rnd>.5 then
+05850     if SSHMX<MMSHL then let SSHMX=SSHMX+int(rnd*2550) else let SSHMX=int(rnd*SSHMX)
+05851     let SSHLD=SSHLD+int(500000*rnd)
+05852   else
+05853     let SENG=SENG+int(100000*rnd)
+05854     if SMAXENG<MMENG then let SMAXENG=SMAXENG+int(rnd*2550) else let SMAXENG=int(SMAXENG*rnd)
+05855   end if
+05868   output #2 record SHIP data 00850
+05869   let TM$="We have encountered a strange alien energy deposit.  Ships computers report"
+05870   gosub 02410
+05871   let TM$="a signifigant alteration in our energy reserves."
+05872   gosub 02410
+05873   goto 05594
+05875 end if
+05876 if SH%(1:1)="@" then 05943                  ! Warp to ship
+05877 if SH%(1:1)="$" then                        ! Extra Points to URSCORE
+05878   input #2 record I data 00850
+05879   let SX=rnd*400-200
+05880   let SY=rnd*400-200
+05881   output #2 record I data 00850
+05882   let URSCORE=URSCORE+int(rnd*25)
+05883   input #2 record SHIP data 00850
+05884   let SWCOST=int(SWCOST*.95)
+05885   output #2 record SHIP data 00850
+05886   let TM$="You have found a remain of the USS Lost Dutchman, a ship made of a very"
+05887   gosub 02410
+05888   let TM$="precious substance and incredible warp ability.  We have improved engines."
+05889   gosub 02410
+05890   return
+05891 end if
+05892 if SH%(1:1)="," then                        !stored energy
+05893   input #2 record SHIP data 00850
+05894   if SENG>SMAXENG then print tab(1,24);chr$(11);"Ship has too much energy already ... aborting capsule retrieval.";
+05895   if SENG>SMAXENG then return
+05896   input #2 record I data 00850
+05897   let SH%=""
+05900   let SSTAT=0
+05901   output #2 record I data 00850
+05902   let I=int(SENG-I*SD(6))
+05903   if SOWNER=USER then let TM$="You have collected "&str$(I)&" units from your pod." else let TM$="You have stolen "&str$(I)&" units from another pod."
+05904   if I<1 then let I=0
+05905   input #2 record SHIP data 00850
+05906   let SENG=SENG+I
+05907   output #2 record SHIP data 00850
+05908   gosub 02410
+05909   return
+05912 end if
+05913 if SH%(1:1)=":" then                        ! Transmitter
+05914   let SH%=""
+05915   let SSTAT=0
+05916   output #2 record I data 00850
+05917   if SOWNER=USER then let TM$="Transmitter Collected." else let TM$="Transmitter Destroyed."
+05918   gosub 02410
+05919   return
+05920 end if
+05921 if SH%(1:1)="O" then let INORBIT=I
+05922 if SH%(1:1)="O" then let UPDATE=-1
+05923 if SH%(1:1)="O" then let IOWN=SOWNER
+05925 if SH%(1:1)="O" then return
+05926 if SH%(1:1)="*" then
+05927   input #2 record SHIP data 00850
+05928   if SSHLD<5000 then
+05929     let SENG=SENG-int((5000-SSHLD)/5)
+05930     output #2 record SHIP data 00850
+05931     let TM$=chr$(14)&"WARNING!!  WARNING!!  SHIELDS UNABLE TO PROTECT SHIP FROM SUN'S HEAT!"&chr$(15)
+05932     gosub 02410
+05933   end if
+05934   return
+05935 end if
+05940 let TM$="Ships sensors unable to identify nearby object."
+05941 gosub 02410
+05942 return
+05943 input #2 record I data 00850                ! Warp to a ship
+05944 let SX=rnd*700-350
+05945 let SY=rnd*700-350
+05946 output #2 record I data 00850
+05947 let I=0
+05948 let I=I+1
+05949 input #2 eof 05961, record I data 00850
+05950 if SSTAT<>1 or rnd<.2 then 05948
+05951 let X=SX
+05952 let Y=SY
+05953 input #2 record SHIP data 00850
+05954 let X,SX=X+rnd*10-5
+05955 let Y,SY=Y+rnd*10-5
+05956 if SSHLD>0 then let SENG=SENG-int(rnd*1000)
+05957 output #2 record SHIP data 00850
+05958 let TM$="Ship has stumbled into a matter seeking dimensional sphere."
+05959 gosub 02410
+05960 goto 05594
+05961 input #2 record SHIP data 00850
+05962 let TM$="The sphere has disappeared."
+05963 gosub 02410
+05964 goto 05594
+05965 characteristics "ON","NRM"
+05966 let LST1,LST2,LST3,LST4,LST9=-99        ! force update of all screen items
+05967 print chr$(12);                             ! redraw screen
+05968 print "+";rpt$("-",21);"+"
+05969 for I=2 to 12
+05970   print "|";tab(23,I);"|"
+05971 next I
+06050 print "+";rpt$("-",21);"+ ";tab(25,12);SH$;
+06051 print tab(25,1);"Location:";tab(25,2);"Warp Factor:";tab(25,3);"Degree:";tab(25,5);"Energy:";tab(25,7);"Shields:";tab(25,9);"Score:";tab(50,9);"Kills:";
+06060 gosub 05500                                 ! see stars
+06100 input #2 record SHIP data 00850             ! report base location
+06101 if SD(6)>=1 then print tab(1,23);"Unable to access memory banks.";chr$(11);
+06102 if SD(6)>=1 then 07000
+06108 input #1 record USER data 00830
+06120 let X1=SX
+06121 let Y1=SY
+06122 let X2=BX
+06123 let Y2=BY
+06124 gosub 01000
+06125 let TM$="Base Location ("&str$(BX)&","&str$(BY)&")  Deg: "&str$(DEG)&"  Dis: "&str$(DIS)
+06126 gosub 02410
+06127 goto 07000
+06200 gosub 06300                                 ! select item to break
+06225 input #2 record SHIP data 00850
+06230 let SD(I)=SD(I)+rnd
+06240 output #2 record SHIP data 00850
+06241 if TM$<>"" then
+06242   if SD(I)>2 then let TM$=TM$&" have been permanently damaged." else if SD(I)>=1 then let TM$=TM$&" have been damaged very badly." else if SD(I)>0 then let TM$=TM$&" damaged, but still functional."
+06243   gosub 02410
+06245 end if
+06250 return
+06300 let I=int(rnd*8)+1                          ! select a ship item
+06301 select I
+06302 case 1
+06303   let TM$="View Screen"
+06304 case 2
+06305   let TM$="Short Range Scanner"
+06306 case 3
+06307   let TM$="Warp Drive"
+06308 case 4
+06309   let TM$="Shield Control"
+06310 case 5
+06311   let TM$="Phaser Banks"
+06312 case 6
+06313   let TM$="Ship Computers"
+06345 case else
+06346   let TM$=""
+06350 end select
+06352 return
+06400 if TURN/10<>int(TURN/10) then return
+06405 gosub 06300                                 ! select item for repair
+06410 input #2 record SHIP data 00850
+06412 if SD(I)=0 then return
+06420 if SD(I)<2 then if INORBIT=0 then let SD(I)=SD(I)-rnd/7 else let SD(I)=SD(I)-rnd/3
+06421 if SD(I)>=2 and INORBIT>0 then let SD(I)=SD(I)-rnd/7
+06425 if SD(I)<0 then let SD(I)=0
+06430 if TM$<>"" then
+06432   if SD(I)=0 then let TM$=TM$&" has been completely repaired." else if SD(I)<1 then let TM$=TM$&" are repaired enough to use." else let TM$=""
+06433   gosub 02410
+06434 end if
+06440 output #2 record SHIP data 00850
+06445 return
+06450 if QUITTING>=0 then 07000                   ! Quitting Delay
+06451 let QUITTING=TURN+15
+06452 if QUITTING>99999 then let QUITTING=QUITTING-99999
+06453 goto 07000
+06500 mat VL$=nul$                                ! damage control
+06502 for I=1 to 6
+06505   gosub 06301
+06510   let TM$=TM$&rpt$(" ",22-len(TM$))
+06512   if SD(I)>2 then let TM$=TM$&"Permanent" else if SD(I)>1 then let TM$=TM$&"Severe" else if SD(I)>.5 then let TM$=TM$&"Heavy" else if SD(I)>.3 then let TM$=TM$&"Critical" else if SD(I)>0 then let TM$=TM$&"Light" else let TM$=TM$&"No"
+06515   let VL$(I)=TM$&" Damage"&rpt$(" ",58-len(TM$))&str$(SD(I)*100)&"%"
+06520 next I
+06530 gosub 02400
+06540 goto 07000
+06600 input #2 record SHIP data 00850             ! thruster move
+06601 if SENG<3 then print tab(1,23);"* * NOT ENOUGH ENERGY FOR THRUSTERS * *";chr$(11);
+06602 if SENG<3 then 07000
+06605 let INORBIT,IOWN=0
+06609 gosub 05594                                 ! thruster move
+06610 gosub 07200                                 ! show move
+06620 goto 09089
+07000 print tab(1,24);">";
+07001 input #2 record SHIP data 00850
+07002 if SENG<0 then 08200
+07003 if TURN>99999 then let TURN=0 else let TURN=TURN+1
+07004 if SSHLD>SSHMX then let SSHLD=SSHLD-100
+07005 if TURN<NORELEASE then print tab(15,24);"     ";chr$(22);"COMBAT SITUATION - MUST STAY IN GAME";chr$(2); else if QUITTING>=0 then print tab(15,24);chr$(22);"QUITTING GAME -- DELAY INSTALLED TO PREVENT CHEATING";chr$(2);
+07006 let SSTAT=1
+07007 output #2 record SHIP data 00850
+07008 if NORELEASE>99999 then let NORELEASE=0 else if TURN<NORELEASE then let QUITTING=-1
+07009 enable handler RESM, resume at 07110
+07010 linput tab(2,24), prompt "", bytes 1, noecho, wait 1:G$
+07011 if QUITTING>=0 then print chr$(11);"  ** QUIT CANCLED **"; else print chr$(11);
+07012 if QUITTING>=0 then let QUITTING=-1
+07013 let G=ord(G$)
+07014 if G=30 then 08000
+07015 if G=ord("p") or G=ord("P") then 08480      ! phasers
+07016 if G=ord("B") or G=ord("b") then 06100
+07017 if G=ord("I") or G=ord("i") then 06500
+07018 if G=ord("C") or G=ord("c") then 02440      ! Deposit energy Capsule
+07019 if G=ord(":") or G=ord(";") then 02481      ! Drop your transmitter
+07022 if G=81 then 06450              ! later check to be sure and see if docked
+07023 if G=26 then let Y=Y-1
+07029 if G=25 then let X=X-1
+07030 if G=24 then let X=X+1
+07035 if G=23 then let Y=Y+1
+07036 if G>22 and G<27 then 06600                 ! thrusters
+07056 if G=11 then
+07057   print tab(1,23);chr$(11);
+07058   goto 07000
+07059 end if
+07066    !if G=ord("~") and MANAGER then stop         !  STOP IF ~ FOR DEBUGGING
+07067 if G=ord("R") or G=ord("r") then 08300
+07068 if G=ord("M") or G=ord("m") then 08400
+07069 if G=ord("S") or G=ord("s") then 07300
+07070 if G=32 then
+07071   let WARP=0
+07072   print tab(1,23);"Warp Engines Shutdown";chr$(11);
+07073   goto 09089
+07074 end if
+07075 if G=12 then
+07076   gosub 02420
+07077   goto 07000
+07078 end if
+07079 if G=ord("?") then                          ! help screen
+07080   gosub 02430                               ! help screen
+07081   goto 07000
+07082 end if
+07083 if G=ord("W") or G=ord("w") then 09000
+07084 if G=ord("D") or G=ord("d") then 09030      ! change degree
+07085 if G=ord("q") then
+07086   print tab(1,23);"Pressing F15 or capital Q will return you to the Galaxy Computer.";chr$(11);
+07087   goto 07000
+07088 end if
+07090 if G=ord("A") or G=ord("a") then 02000
+07100 print tab(1,23);"Unknown Command - Press ? For Help  - ";G;chr$(11);
+07101 let TURN=TURN-1
+07105 goto 07000
+07110 disable handler
+07111 if TURN>99999 then let TURN=0 else let TURN=TURN+1
+07115 gosub 02550                                 ! check the shared files
+07117 gosub 06400
+07120 input #2 record SHIP data 00850
+07125 if SENG<0 then 08200
+07126 if TURN>=QUITTING and QUITTING>0 then 05450
+07130 print tab(1,24);">";                        ! reset bottom line
+07135 if SENG<SMAXENG and SSHLD<=SSHMX then
+07140   if SENG<100 then let SENG=SENG+int(SENGREG/3.7) else if SENG<500 then let SENG=SENG+int(SENGREG/2) else if SSHLD=0 then let SENG=SENG+SENGREG+int(.21*SENGREG) else let SENG=SENG+SENGREG ! harm ships wasting energy
+07145   if SENG>SMAXENG then let SENG=SMAXENG
+07150   output #2 record SHIP data 00850
+07155 end if
+07160 if SSHLD>0 then gosub 07500
+07165 let WARP=SWARP
+07170 let DEG=SDEG
+07171 if SWARP>0 then let TEMP=TEMP+int(WARP/2)+1 else if TEMP>0 then let TEMP=TEMP-3 else let TEMP=0
+07175 if SWARP<>0 then 09055                      ! start of auto computations
+07180 if UPDATE<>0 or SENG<>LSTENG then gosub 05500            ! update viewport
+07185 let LSTENG=SENG
+07190 goto 07001
+07200 input #2 record SHIP data 00850             ! thruster updates
+07201 let SENG=SENG-3
+07210 let SX=X
+07220 let SY=Y
+07230 output #2 record SHIP data 00850
+07240 goto 05500
+07300 enable handler RESM, resume at 07000
+07301 if SD(4)>=1 then print tab(1,23);"!!! SHIELD CONTROL DAMAGED -- UNABLE TO ALTER SHIELD SETTING";
+07302 if SD(4)>=1 then 07000
+07305 linput tab(1,23), prompt "Energy to Shields: "&chr$(30)&"FF", wait 15:N$
+07306 if rtrm$(N$)="" then 07000
+07307 gosub 05800
+07308 if ER<>0 then
+07309   print tab(1,23);"Error In Shield Allocation";chr$(11);
+07310   goto 07000
+07311 end if
+07312 if N<>int(abs(N)) then
+07313   print tab(1,23);"Illegal Quanity For Shield Control";chr$(11);
+07314   goto 07000
+07315 end if
+07316 if SD(4)>0 then
+07317   let TM$="Trying to allocate "&str$(N*(1-SD(4)))&" unit(s) to damaged shield."
+07318   let N=int(N*(1-SD(4)))
+07319   gosub 02410
+07323 end if
+07324 input #2 record SHIP data 00850
+07325 if N>SENG+SSHLD then
+07326   print tab(1,23);"Not enough energy to meet demands.";chr$(11);
+07329   if N>SSHMX then let TM$="Shield Control Overloading - Energy Being Released"
+07330   if N>SSHMX then gosub 02410
+07331   goto 07000
+07332 end if
+07333 if N=0 then let TMP$="Dropping Shields" else if N=SSHLD then let TMP$="No Change In Shield Status" else if N=SSHMX then let TMP$="Shield To Maximum" else if N>SSHLD then let TMP$="Raising Shield Power" else let TMP$="Lowering Shield Power"
+07334 if N=0 then let TEXT%="dropping shields." else let TEXT%="raising shields."
+07335 let GVAL=0
+07336 let STO=0
+07337 let MTYP=7
+07338 gosub 02557
+07339 if N<=SSHMX and SSHLD>SSHMX then
+07340   let TM$="Energy Overload From Shields Was Drained To Space To Avoid Internal Explosion"
+07341   gosub 02410
+07342   let SSHLD=SSHMX
+07343 end if
+07354 if N>SSHLD then let SENG=SENG-(N-SSHLD) else let SENG=SENG+(SSHLD-N)
+07355 let SSHLD=N
+07356 if SENG>SMAXENG then
+07357   let TMP$=TMP$&"  --"&str$(SENG-SMAXENG)&" UNITS LOST IN ENEGRY OVERFLOW--"
+07358   let SENG=SMAXENG
+07359 end if
+07360 output #2 record SHIP data 00850
+07361 print tab(1,23);TMP$;chr$(30);"FF";
+07362 gosub 05500
+07363 goto 07000
+07364 input #2 record SHIP data 00850
+07365 if SENG-130<0 then print tab(1,23);"Not Enough Energy For Triangulation Sensors";
+07366 if SENG-130<0 then 07000
+07367 if SD(6)>=.4 then print tab(1,23);"Computer Triangulator Damaged";
+07368 if SD(6)>=.4 then 07000
+07369 let X1=SX
+07370 let Y1=SY
+07371 let I,J=0
+07372 let I=I+1
+07373 input #2 eof 07392, record I data 00850
+07374 if rtrm$(SH%)="" or I=SHIP or SSTAT=0 or SSTAT=2 then 07372
+07375 let X2=SX
+07376 let Y2=SY
+07377 gosub 01000
+07378 if SSTAT=3 then if pos("O*",SH%(1:1))=0 and DIS>10 then 07372 else if DIS>50 then 07372
+07390 if J=0 or DIS<J then if DIS>4.5 then let J=DIS
+07391 goto 07372
+07392 if J<=0 or J>TRIANG then let TM$="Triangulator Reports No Known Activity In A "&str$(TRIANG)&" Unit Radius" else let TM$="Triangulator Reports Nearest Disturbance In Space "&str$(J)&" Units Away"
+07393 input #2 record SHIP data 00850
+07394 let WARP=SWARP
+07395 let DEG=SDEG
+07396 let SENG=SENG-130
+07397 output #2 record SHIP data 00850
+07398 gosub 02410
+07399 goto 07000
+07500 if SENG-5<0 then                            ! shield control
+07501   let TM$="Shield Relays Unable To Maintain Shield Charge"
+07502   let SENG=SENG+int(SSHLD/3)
+07503   if SENG>SMAXENG then let SENG=SMAXENG
+07504   gosub 02410
+07505   let SSHLD=0
+07506 else
+07507   let SENG=SENG-5
+07508 end if
+07510 if SSHLD>SSHMX then if (SSHLD-SSHMX)*.6>250 then let SSHLD=SSHLD-(SSHLD-SSHMX)*.12 else let SSHLD=SSHLD-250
+07553 output #2 record SHIP data 00850
+07554 gosub 05568
+07555 return
+08000 enable handler RESM, resume at 07000        ! handle function keys
+08010 linput prompt "", bytes 1, noecho, wait 2:G$
+08020 let G=ord(G$)
+08021 if G=112 then 06450                         ! F15 Leave
+08022 if G=113 then 07364                         ! triangulator
+08023 if G=114 then                               ! short range scan
+08024   let SRS=-1
+08025   let TM$="Short Range Sensor Report"
+08026   gosub 02410
+08027   gosub 05500
+08028   goto 07000
+08029 end if
+08030 if G=92 or G=93 then let Y=Y+1
+08031 if G=94 or G=95 then let Y=Y-1
+08032 if G=92 or G=94 then let X=X-1
+08033 if G=93 or G=95 then let X=X+1
+08034 if G>91 and G<96 then 06600                 ! thrusters
+08080 if G=97 then 05965                          ! refresh screen
+08081 if G=117 then 08800                         ! locate point
+08082 if G=118 then 08900                         ! scan a ship
+08099 print tab(1,23);"Illegal Computer Function - Code ";str$(G);chr$(11);
+08100 goto 07000
+08200 print chr$(12);chr$(14);"*** YOUR SHIP HAS BEEN DESTROYED ***";chr$(15)
+08201 if IM$<>"" then print chr$(10);chr$(10);IM$;chr$(10);chr$(10) else print "Your energy level dropped below zero causing your internal reactor to meltdown.";chr$(10);"Shortly after the anti-matter mix you exploded violently into space dust."
+08202 input #2 record SHIP data 00850
+08205 print chr$(10);"The ";rtrm$(SH%);" was destroyed on ";date$;" ";time$;"."
+08210 let SH%,IM$=""
+08212 let SSTAT,URSCORE,URKILL=0
+08220 output #2 record SHIP data 00850
+08230 input #1 record USER data 00830
+08232 let DTH=DTH+1
+08235 output #1 record USER data 00830
+08236 print "That makes";DTH;"death(s) so far."
+08249 print chr$(10);chr$(10)
+08250 goto 05100
+08300 enable handler RESM, resume at 07000
+08310 input #2 record SHIP data 00850
+08320 linput tab(1,23), prompt "Radio Channel (A/B/C/?): "&chr$(11), wait 60, bytes 1:R$
+08321 if R$="?" then 08354
+08322 let R$=uprc$(R$)
+08325 if pos("ABC",R$)=0 then
+08327   print tab(1,23);chr$(30);"FFInvalid Radio Channel";
+08328   goto 07110
+08329 end if
+08330 linput tab(1,24), prompt "Frequency (0"&chr$(28)&"ff"&chr$(29)&"-100): ", wait 60:N$;
+08332 gosub 05800
+08335 if ER<>0 then
+08336   print tab(1,23);chr$(30);"FFRadio Frequency Unchanged";
+08337   goto 07110
+08338 end if
+08340 if N<>abs(int(N)) or N>100 then
+08342   print tab(1,23);chr$(30);"FFInvalid Frequency Selected - Frequency Unchanged";
+08344   goto 07110
+08346 end if
+08348 if R$="A" then let SR1=N
+08350 if R$="B" then let SR2=N
+08352 if R$="C" then let SR3=N
+08353 output #2 record SHIP data 00850
+08354 let TM$="Radio Frequency Settings:"
+08355 print tab(1,23);chr$(11);
+08356 gosub 02410
+08360 let TM$="Channel A: "&FNOFF$(SR1)&"  Channel B: "&FNOFF$(SR2)&"  Channel C: "&FNOFF$(SR3)
+08362 gosub 02410
+08366 goto 07110
+08400 print tab(1,14);chr$(30);"FFSend A Message";chr$(10);"--------------";chr$(10)
+08402 enable handler RESM, resume at 08425
+08410 linput prompt "On What Channel (A/B/C): ", wait 15, bytes 1:R$
+08420 let R$=uprc$(R$)
+08421 if pos("ABC",R$)>0 then 08430
+08425 gosub 02400
+08426 goto 07000
+08430 if R$="A" and SR1=0 or R$="B" and SR2=0 or R$="C" and SR3=0 then
+08431   print tab(1,23);chr$(11);chr$(30);"FFThat Channel Is Not Raised";
+08432   gosub 02400
+08433   goto 07110
+08434 end if
+08437 input #2 record SHIP data 00850
+08440 print chr$(10);"Enter Message Below - Press NEWLINE to Send"
+08442 linput prompt "", wait 60:C$
+08444 if ltrm$(rtrm$(C$))="" then 07110
+08451 let TEXT%=C$(1:100)
+08452 let MTYP=2
+08453 let STO=0
+08454 if R$="A" then let GVAL=SR1
+08455 if R$="B" then let GVAL=SR2
+08456 if R$="C" then let GVAL=SR3
+08465 gosub 02557
+08466 goto 07110
+08480 enable handler RESM, resume at 08520        ! Phaser Lock
+08491 let NRS=1
+08501 if SD(5)>=1 then print tab(1,23);"Phaser Banks not operational due to damage.";chr$(11);
+08502 if SD(5)>=1 then 07000
+08503 let TEXT%="arming phasers."
+08504 let GVAL,STO=0
+08505 let MTYP=7
+08506 gosub 02557
+08507 print tab(1,23);"Phaser Lock, Select Target: ";chr$(30);"FF";
+08508 linput prompt "", wait 30:N$
+08509 if rtrm$(N$)="" then
+08510   print tab(1,23);"Phaser fire canceled.";chr$(11);
+08511   goto 07000
+08512 end if
+08513 let N$=uprc$(rtrm$(ltrm$(N$)))
+08515 let NORELEASE=TURN+30
+08520 let I=pos(N$,",")
+08521 let PN=-1
+08522 if I=0 then 08600                           !   **ASSUME SHIP NAME**
+08530 let I=pos(N$,")")
+08531 if I=0 then 08534
+08532 let N$(I:I)=" "
+08533 goto 08530
+08534 let I=pos(N$,")")
+08535 if I=0 then 08540
+08536 let N$(I:I)=" "
+08537 goto 08534
+08540 let I=pos(N$,",")
+08542 let TMP$=N$(1:I-1)
+08543 let N$=N$(I+1:len(N$))
+08545 gosub 05800
+08550 if ER<>0 then 08590                         ! report error
+08551 let Y2=N
+08552 let N$=TMP$
+08553 gosub 05800
+08554 if ER<>0 then 08590                         ! report error
+08555 let X2=N
+08557 let I=0
+08558 let I=I+1
+08559 input #2 eof 08570, record I data 00850
+08560 if rtrm$(SH%)="" or SSTAT<>1 then 08558
+08561 if SX=X2 and SY=Y2 then 08580
+08565 goto 08558
+08570 let I=0
+08580 let PN=0
+08589 goto 08617                                  ! get energy and fire
+08590 print tab(1,23);"Illegal co-ordinate lock provided.";chr$(11);
+08591 goto 07000
+08600 let I=0
+08602 if SD(2)>=1 then print tab(1,23);"Scanners knocked out - you must use co-ordinate method to fire.";chr$(11);
+08603 if SD(2)>=1 then 07000
+08604 if SD(2)<rnd or SD(2)=0 then 08607
+08605 print tab(1,23);"Damaged scanners unable to locate ship.";chr$(11);
+08606 goto 07000
+08607 let I=0
+08610 let I=I+1
+08611 input #2 eof 08615, record I data 00850
+08612 if rtrm$(SH%)="" or SSTAT<>1 then 08610
+08613 if LEFT$(rtrm$(SH%),len(N$))=N$ then 08617
+08614 goto 08610
+08615 print tab(1,23);"That ship does not appear in sensor range.";chr$(11);
+08616 goto 07000
+08617 if I=0 then 08615
+08618 if SSTAT<>1 then 08615
+08619 if I=SHIP then
+08620   print tab(1,23);"That's us sir...  nice try.";chr$(11);
+08621   goto 07000
+08622 end if
+08623 let X2=SX
+08624 let Y2=SY
+08625 input #2 record SHIP data 00850
+08626 let X1=SX
+08627 let Y1=SY
+08628 gosub 01000
+08629 input #2 record I data 00850
+08637 if DIS=0 then print tab(1,23);chr$(11);"A phaser shot at this close of a range would damage us.";
+08638 if DIS=0 then 07000
+08639 if PN=-1 and DIS>75 then 08615
+08640 if PN=0 and DIS>150 then 08615
+08641 if SWARP>=3 and rnd>.35 then
+08642   print tab(1,23);chr$(14);"** Ship Is In Warp Drive, Phasers Unable To Obtain A Lock **";chr$(11);chr$(15);
+08643   goto 07000
+08644 end if
+08651 print tab(1,23);"Phasers locked on";
+08652 if I<>0 then print " ";rtrm$(SH%);
+08653 if PN=0 or DIS<=12 then print "   (";str$(X2);",";str$(Y2);")  DIS:";DIS;chr$(11);
+08654 if I<>0 and SOWNER=USER then print tab(1,24);chr$(11);tab(60,24);chr$(14);"*ONE OF OUR SHIPS*";chr$(15);
+08655 let DESHIP=I
+08660 print tab(1,24);"Units to Fire: ";
+08661 input #2 record SHIP data 00850
+08662 enable handler RESM, resume at 07000
+08663 linput prompt "", wait 10:N$;
+08664 print tab(1,24);chr$(11);
+08665 let N$=rtrm$(N$)
+08667 if N$="" then
+08668   print tab(1,23);"Phaser fire canceled.";chr$(30);"FF";
+08669   goto 07000
+08670 end if
+08672 gosub 05800
+08673 if ER<>0 or N<0 or N<>int(N) then
+08675   print tab(1,23);"Illegal enegry unit specification.";chr$(11);
+08677   goto 07000
+08678 end if
+08679 if SENG-N<0 then
+08680   print tab(1,23);"Not enough energy for phaser banks.";chr$(11);
+08681   goto 07000
+08682 end if
+08683 if N<1 then print tab(1,23);"Phaser Fire Canceled.";chr$(11);
+08684 if N<1 then 07000
+08685 if N>MAXPHSR then print tab(1,23);"That much heat would blow us to bits!";chr$(11);
+08686 if N>MAXPHSR then 07000
+08700 print tab(60,23);N;"unit(s) fired!";chr$(11);
+08701 input #2 record SHIP data 00850
+08702 let SENG=SENG-N
+08703 output #2 record SHIP data 00850
+08705 gosub 05575
+08706 if I=0 then
+08707   print tab(1,23);"Dust in co-ordinate has been vaporized.";chr$(30);"FF";
+08708   goto 07000
+08709 end if
+08710 let X1=SX
+08720 let Y1=SY
+08730 gosub 01000
+08740 input #2 record SHIP data 00850
+08741 if SD(5)<=rnd or SD(5)=0 then 08753
+08745 print tab(1,23);"!!! Phaser Malfunction - ";chr$(11);
+08746 let I=int(rnd*3)
+08747 if I=0 then print "Phasers Did Not Fire !!!  ENERGY LOST";chr$(11);
+08748 if I=1 then let N=int(N/2)
+08749 if I=1 then print "Power Drain == HITTING WITH ONLY";N;"UNIT(S)";chr$(11);
+08750 if I=1 then 08753
+08751 if I=2 then print "TARGET MISSED";chr$(11);
+08752 goto 07000
+08753 if DIS=0 then let DIS=1
+08754 if PN=0 then let DAM=int(2*N/DIS) else let DAM=int(2.2*N/DIS) ! damage done
+08756 if SSHLD=0 then let DAM=DAM*1.2
+08760 let TEXT%=chr$(14)&"** "&chr$(15)&str$(DAM)&" unit hit from "&rtrm$(SH%)&chr$(14)&" **"&chr$(15)
+08762 let STO=DESHIP
+08763 let MTYP=3                                  ! phaser fire
+08765 let GVAL=DAM                                ! damage done
+08769 gosub 02557                                 ! write it out
+08770 goto 07000
+08800 input #2 record SHIP data 00850
+08801 if SENG<20 then print tab(1,23);"Not enough energy to activate computer.";chr$(11);
+08802 if SD(6)>1 and SENG>=20 then print tab(1,23);"Ship computer not responding.";chr$(11)
+08803 if SD(6)>1 or SENG<20 then 07000
+08804 print tab(1,23);"Enter co-ordinates to locate: ";chr$(11);
+08805 enable handler RESM, resume at 07000
+08806 linput prompt "", wait 60:N$
+08807 if pos(N$,",")=0 then 07000
+08808 let I=pos(N$,")")
+08809 if I=0 then 08812
+08810 let N$(I:I)=" "
+08811 goto 08808
+08812 let I=pos(N$,"(")
+08813 if I=0 then 08816
+08814 let N$(I:I)=" "
+08815 goto 08812
+08816 let I=pos(N$,",")
+08817 let TMP$=rtrm$(ltrm$(N$(1:I-1)))
+08818 let N$=ltrm$(rtrm$(N$(I+1:len(N$))))
+08819 gosub 05800
+08820 let Y2=N
+08821 if ER<>0 then 08851
+08822 let N$=TMP$
+08823 gosub 05800
+08824 let X2=N
+08825 if ER<>0 then 08851
+08826 input #2 record SHIP data 00850
+08827 let X1=SX
+08828 let Y1=SY
+08829 gosub 01000
+08830 if SD(6)>0 then let DEG=int(DEG)
+08831 if SD(6)>0 then let DIS=int(DIS)
+08832 let SENG=SENG-20
+08833 output #2 record SHIP data 00850
+08840 print tab(1,23);chr$(11);
+08841 let TM$="("&str$(SX)&","&str$(SY)&") to ("&str$(X2)&","&str$(Y2)&")  Deg: "&str$(DEG)&"  Dis: "&str$(DIS)&"  Course Set"
+08842 gosub 02410
+08843 input #2 record SHIP data 00850
+08844 let SDEG=DEG
+08845 output #2 record SHIP data 00850
+08846 let UPDATE=-1
+08850 goto 07000
+08851 print tab(1,23);chr$(11);"Invalid entry for computer request.";
+08852 goto 07000
+08900 input #2 record SHIP data 00850             ! scan other ship
+08901 if SD(2)>1 or SD(6)>1 then print tab(1,23);"Scanners and Computers must be operational to scan ships.";chr$(11);
+08902 if SD(2)>1 or SD(6)>1 then 07000
+08903 if SENG<500 then print tab(1,23);"Not enough energy for scan.";chr$(11);
+08904 if SENG<500 then 07000
+08905 print tab(1,23);"Enter ship to scan: ";chr$(11);
+08907 linput eof 07000, prompt "":N$
+08908 let I=0
+08909 let N$=uprc$(ltrm$(rtrm$(N$)))
+08910 if N$="" then 07000
+08911 let I=I+1
+08912 input #2 eof 08920, record I data 00850
+08913 if SSTAT<>1 or rtrm$(SH%)="" then 08911
+08914 if LEFT$(SH%,len(N$))=N$ then 08930
+08916 goto 08911
+08920 print tab(1,23);"Scanners unable to locate ship.";chr$(11);
+08921 goto 07000
+08930 if I=SHIP then print tab(1,23);"That's us sir... Use the command  I  for our readout.";chr$(11);
+08931 if I=SHIP then 07000
+08935 let X2=SX
+08936 let Y2=SY
+08937 input #2 record SHIP data 00850
+08940 let X1=SX
+08942 let Y1=SY
+08943 print tab(1,23);chr$(11);
+08950 gosub 01000
+08951 let SENG=SENG-100
+08952 output #2 record SHIP data 00850
+08960 if DIS>25 then print tab(1,23);"Scanners will be unable to gather information at this distance.  Move closer.";chr$(11);
+08961 if DIS>25 then 07000
+08962 let DESHIP=I
+08963 input #2 record I data 00850
+08964 let TEXT%="We are being scanned."
+08965 let GVAL=0
+08966 let STO=DESHIP
+08967 let MTYP=6
+08968 if SD(6)=0 or SD(6)<rnd then gosub 02557
+08970 let TM$="Scanning Ship "&rtrm$(SH%)&"  ("&str$(SX)&","&str$(SY)&")"
+08971 gosub 02410
+08972 let TM$="Deg: "&str$(DEG)&"  Dis: "&str$(DIS)&"   Shield Status: "
+08973 if SSHLD=0 then let TM$=TM$&"Down" else if SSHLD<100 then let TM$=TM$&"Low" else if SSHLD<200 then let TM$=TM$&"Low" else if SSHLD<1000 then let TM$=TM$&"Up" else if SSHLD<3000 then let TM$=TM$&"Strong" else if SSHLD<4800 then let TM$=TM$&"Strong" else let TM$=TM$&"Full"
+08974 gosub 02410
+08975 if SSHLD>2950+int(rnd*100) then
+08976   let TM$="Scanners unable to penatrate shield."
+08977   gosub 02410
+08978   goto 07000
+08979 end if
+08980 let DAM=int(SSHLD/15)+100
+08981 for I=1 to 6
+08982   if SD(I)>SSHLD/SSHMX then
+08983     gosub 06301
+08984     let TM$=TM$&" is damaged."
+08985     gosub 02410
+08986     let DAM=DAM+5
+08987   end if
+08988 next I
+08989 if SSHLD<1000 then let TM$="Energy Readings    Energy: "&str$(SENG)&"  Shields: "&str$(SSHLD)
+08990 if SSHLD<1000 then gosub 02410
+08991 if SSHLD<1000 then let DAM=DAM+25
+08992 input #2 record SHIP data 00850
+08993 let SENG=SENG-DAM
+08994 output #2 record SHIP data 00850
+08995 let UPDATE=-1
+08996 goto 07000
+09000 print tab(1,24);chr$(11);tab(1,23);chr$(23);                        ! WARP
+09001 input #2 record SHIP data 00850
+09002 if SD(3)>=1 then
+09003   print tab(1,23);"Warp Drive Has Been Damaged.  You Must Use Impulse Drive.";
+09004   goto 07000
+09005 end if
+09010 linput tab(1,23), prompt "Warp: "&chr$(30)&"FF", wait 15:N$;
+09011 if ltrm$(N$)="" then
+09012   print tab(1,23);"Course and Heading Not Altered";chr$(11);
+09013   goto 07000
+09014 end if
+09015 gosub 05800
+09018 if ER<>0 or N<0 then print tab(1,23);"Illegal Warp Factor";chr$(11);
+09019 if ER<>0 or N<0 then 07000
+09020 let WARP=N
+09021 input #2 record SHIP data 00850
+09022 if SENG-SWCOST*WARP<=0 then
+09023   print tab(1,23);"Not Enough Energy For Warp Drive";chr$(11);
+09024   goto 07000
+09025 end if
+09026 if SD(3)>0 and WARP>int(12*(1-SD(3))) then
+09027   print tab(1,23);"Warp Drive Is Damaged - Max Warp is ";12*(1-SD(3))
+09028   goto 07000
+09029 end if
+09030 let N$=""
+09031 linput tab(1,24), prompt "Degree: "&chr$(11), wait 60:N$;
+09032 if ltrm$(N$)="" then let N$=str$(SDEG)
+09033 print tab(1,24);chr$(11);
+09034 gosub 05800
+09037 if ER<>0 then 07000
+09038 input #2 record SHIP data 00850
+09039 let SDEG=N
+09040 output #2 record SHIP data 00850
+09041 let DEG=SDEG
+09042 let INORBIT,IOWN=0
+09045 if WARP>MAXWARP then print tab(1,23);"Maximum Warp Known Possible Is Warp 12, But That Is Pushing To The Limit.";chr$(11);
+09046 if WARP>MAXWARP then 07000
+09047 output #2 record SHIP data 00850
+09050 if WARP<0 then
+09051   print tab(1,23);"Incorrect Warp Factor";chr$(11);
+09052   goto 07000
+09053 end if
+09054 input #2 record SHIP data 00850
+09055 if SENG-SWCOST*WARP<=0 then
+09056   let TM$="Not Enough Energy To Warp"
+09057   gosub 02410
+09058   let WARP=0
+09059   let TM$="Warp Engines Shut Down Due To Lack Of Power"
+09060   gosub 02410                               ! show text
+09061 end if
+09062 if TEMP>100 or TEMP>(15-WARP)*10 then
+09063   let TM$="Warp Engines Overheated - Engines Shut Down To Cool"
+09064   gosub 02410
+09065   let WARP=0
+09067 end if
+09070 let DIS=WARP*10
+09071 let X1=X
+09072 let Y1=Y
+09073 gosub 01200
+09082 let X=X2
+09083 let Y=Y2
+09085 gosub 05594                                 ! check bumps and range
+09086 input #2 record SHIP data 00850
+09087 print tab(1,23);"Warp:";WARP;"  Degree:";SDEG;chr$(11);
+09088 disable handler
+09089 input #2 record SHIP data 00850          ! update X,Y,WARP,DEG in ship rec
+09090 let SWARP=WARP
+09092 let SX=X
+09093 let SY=Y
+09094 let SENG=SENG-WARP*SWCOST
+09095 output #2 record SHIP data 00850
+09097 gosub 05568
+09100 let MTYP=1                           ! tell all to update because we moved
+09101 let STO=0                                   ! it is to everone
+09102 let GVAL=0                                  ! to no one
+09103 let TEXT%=SH$                               ! ship name
+09105 gosub 02557                                 ! update event
+09115 gosub 05500                                 ! update screen
+09120 goto 07000
+09800 enable handler RESM, resume at 00980
+99900 print chr$(29);chr$(18);chr$(15)
+99902 enable handler RESM, resume at 99920
+99910 linput prompt "-press a key-", bytes 1, noecho, wait 60:A$
+99920 print chr$(13);chr$(11);
+99921 disable handler
+99922 close
+99930 end
